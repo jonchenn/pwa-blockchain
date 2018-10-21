@@ -22,10 +22,40 @@
   color: #61dafb;
 }
 
+.ChatRoom {
+  height: 100vh;
+}
+
+.ChatRoom header {
+  color: #999;
+  font-size: 1.5em;
+  height: 10vh;
+  text-align: center;
+}
+
+.ChatRoom .message {
+  color: #555;
+}
+
+.ChatBody {
+  background: #eee;
+  height: 80vh;
+  margin: 0;
+}
+
+.ChatInput {
+  height: 10vh;
+}
+
 form input {
   border: 1px solid #ddd;
   padding: 10px;
   margin: 10px;
+}
+
+input[type=text] {
+  width: 70%;
+  font-size: 20px;
 }
 
 @keyframes App-logo-spin {

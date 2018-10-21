@@ -1,55 +1,21 @@
-import React, {Component} from 'react';
-import logo from './logo.svg';
+import React from 'react'
+import { Switch, Route } from 'react-router-dom'
+import Setup from './Setup'
+import ChatRoom from './ChatRoom'
 import './App.css';
 
-class App extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      peer: ''
-    };
-
-    this.handleChange = this.handleChange.bind(this);
-    this.handleSubmit = this.handleSubmit.bind(this);
-  }
-
-  handleChange(event) {
-    this.setState({peer: event.target.value});
-  }
-
-  handleSubmit(event) {
-    // alert('A name was submitted: ' + this.state.value);
-
-    fetch('/addPeer', {
-      method: "POST",
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        'peer': this.state.peer
-      }),
-    });
-    // .then(response => response.json());  parses response to JSON
-
-    event.preventDefault();
-  }
-
-  render() {
-    return (<div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo"/>
-      </header>
-      <form onSubmit={this.handleSubmit}>
-        <label>
-          Peer:
-          <input type="text" value={this.state.peer} onChange={this.handleChange} />
-        </label>
-        <input type="submit" value="Submit"/>
-      </form>
-
-    </div>);
-  }
-}
+// The Main component renders one of the three provided
+// Routes (provided that one matches). Both the /roster
+// and /schedule routes will match any pathname that starts
+// with /roster or /schedule. The / route will only match
+// when the pathname is exactly the string "/"
+const App = () => (
+  <main>
+    <Switch>
+      <Route exact path='/' component={ChatRoom}/>
+      <Route exact path='/setup' component={Setup}/>
+    </Switch>
+  </main>
+)
 
 export default App;
