@@ -6,14 +6,23 @@ class ChatRoom extends Component {
     super(props);
     this.state = {
       messageToSend: '',
-      messages: [{
-        user: 'john',
-        message: 'testing',
-      }],
+      messages: [],
     };
 
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
+
+    this.init();
+  }
+
+  async init() {
+    fetch('/blocks').then((data) => {
+      return data.json();
+    }).then((blocks) => {
+      var messages = blocks.map((x) => {return x.data;});
+      messages.shift();
+      this.setState({messages: messages});
+    });
   }
 
   handleChange(event) {
@@ -21,6 +30,20 @@ class ChatRoom extends Component {
   }
 
   handleSubmit(event) {
+    fetch('/mineBlock', {
+      method: "POST",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        'data': {
+          user: 'test',
+          message: this.state.messageToSend,
+        }
+      })
+    });
+
     this.state.messages.push({
       user: 'Me',
       message: this.state.messageToSend,
@@ -35,7 +58,7 @@ class ChatRoom extends Component {
     var items = []
     this.state.messages.forEach((msgItem, index) => {
       items.push(
-        <li key="{index}" className="message">
+        <li key={"message-"+index} className="message">
           <span>{msgItem.user}</span>
           <p>{msgItem.message}</p>
         </li>
