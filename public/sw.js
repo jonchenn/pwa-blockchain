@@ -2,8 +2,14 @@ importScripts('https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-j
 importScripts('https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/hmac-sha256.min.js')
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/3.6.1/workbox-sw.js');
 importScripts('https://cdn.jsdelivr.net/npm/idb@2.1.3/lib/idb.min.js');
-importScripts('https://www.gstatic.com/firebasejs/4.12.0/firebase-app.js');
-importScripts('https://www.gstatic.com/firebasejs/4.12.0/firebase-messaging.js');
+
+const broadcastEndpoint = 'https://us-central1-pwa-blockchain.cloudfunctions.net/broadcast';
+
+const MessageType = {
+  QUERY_LATEST: 0,
+  QUERY_ALL: 1,
+  RESPONSE_BLOCKCHAIN: 2
+};
 
 // Init IndexedDB
 let blockchain = [];
@@ -94,17 +100,70 @@ var isValidNewBlock = (newBlock, previousBlock) => {
   return true;
 };
 
-// var replaceChain = (newBlocks) => {
-//   if (isValidChain(newBlocks) && newBlocks.length > blockchain.length) {
-//     console.log('Received blockchain is valid. Replacing current blockchain with received blockchain');
-//     blockchain = newBlocks;
-//     broadcast(responseLatestMsg());
-//   } else {
-//     console.log('Received blockchain invalid');
-//   }
-// };
+var replaceChain = (newBlocks) => {
+  if (isValidChain(newBlocks) && newBlocks.length > blockchain.length) {
+    console.log('Received blockchain is valid. Replacing current blockchain with received blockchain');
+    blockchain = newBlocks;
+    db.set('blockchain', blockchain);
+    broadcast(responseLatestMsg());
+  } else {
+    console.log('Received blockchain invalid');
+  }
+};
+
+var isValidChain = (blockchainToValidate) => {
+  if (JSON.stringify(blockchainToValidate[0]) !== JSON.stringify(getGenesisBlock())) {
+    return false;
+  }
+  var tempBlocks = [blockchainToValidate[0]];
+  for (var i = 1; i < blockchainToValidate.length; i++) {
+    if (isValidNewBlock(blockchainToValidate[i], tempBlocks[i - 1])) {
+      tempBlocks.push(blockchainToValidate[i]);
+    } else {
+      return false;
+    }
+  }
+  return true;
+};
+
+var handleBlockchainResponse = (message) => {
+  var receivedBlocks = JSON.parse(message.data).sort((b1, b2) => (b1.index - b2.index));
+  var latestBlockReceived = receivedBlocks[receivedBlocks.length - 1];
+  var latestBlockHeld = getLatestBlock();
+  if (latestBlockReceived.index > latestBlockHeld.index) {
+    console.log('blockchain possibly behind. We got: ' + latestBlockHeld.index + ' Peer got: ' + latestBlockReceived.index);
+    if (latestBlockHeld.hash === latestBlockReceived.previousHash) {
+      console.log("We can append the received block to our chain");
+      blockchain.push(latestBlockReceived);
+      db.set('blockchain', blockchain);
+      broadcast(responseLatestMsg());
+    } else if (receivedBlocks.length === 1) {
+      console.log("We have to query the chain from our peer");
+      broadcast(queryAllMsg());
+    } else {
+      console.log("Received blockchain is longer than current blockchain");
+      replaceChain(receivedBlocks);
+    }
+  } else {
+    console.log('received blockchain is not longer than current blockchain. Do nothing');
+  }
+};
 
 var getLatestBlock = () => blockchain[blockchain.length - 1];
+var queryChainLengthMsg = () => ({
+  'type': MessageType.QUERY_LATEST
+});
+var queryAllMsg = () => ({
+  'type': MessageType.QUERY_ALL
+});
+var responseChainMsg = () => ({
+  'type': MessageType.RESPONSE_BLOCKCHAIN,
+  'data': JSON.stringify(blockchain)
+});
+var responseLatestMsg = () => ({
+  'type': MessageType.RESPONSE_BLOCKCHAIN,
+  'data': JSON.stringify([getLatestBlock()])
+});
 
 var init = async () => {
   blockchain = await db.get('blockchain');
@@ -113,18 +172,25 @@ var init = async () => {
   if (!blockchain) {
     blockchain = [getGenesisBlock()];
     db.set('blockchain', blockchain);
-    db.set('peers', {});
   }
 }
 
-init();
-
-
-
-// Server functions in Workbox
-
-var broadcast = ({}) => {
-
+var broadcast = (data) => {
+  fetch(broadcastEndpoint, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  }).then(function(response) {
+    if (response.status !== 200) {
+      throw response;
+    }
+    return null;
+  }).catch(function(error) {
+    console.error(error);
+    return error;
+  });
 };
 
 var getBlocks = ({
@@ -143,78 +209,71 @@ var mineBlock = async ({
   let body = await event.request.json();
   var newBlock = generateNextBlock(body.data);
   addBlock(newBlock);
-  // broadcast(responseLatestMsg());
+  broadcast(responseLatestMsg());
   return new Response('block added: ' + JSON.stringify(newBlock));
 };
 
-var getPeers = async ({
+var queryAll = async ({
   url,
   event,
   params
 }) => {
-  let peers = await db.get('peers');
-  return new Response(peers);
-};
-
-var addPeer = async ({
-  url,
-  event,
-  params
-}) => {
-  // connectToPeers([req.body.peer]);
-  let peers = await db.get('peers');
-  let body = await event.request.json();
-  // peers.push(body.peer);
-  peers[body.token] = {
-    user: body.user,
+  var error = await broadcast(responseChainMsg());
+  if (error) {
+    return Response.error(error);
   }
-  db.set('peers', peers);
-  return new Response(peers);
+  return new Response(true);
 };
 
-workbox.routing.registerRoute('/mineBlock', mineBlock, 'POST');
-workbox.routing.registerRoute('/blocks', getBlocks);
-workbox.routing.registerRoute('/addPeer', addPeer, 'POST');
-workbox.routing.registerRoute('/peers', getPeers);
+var queryLatest = async ({
+  url,
+  event,
+  params
+}) => {
+  broadcast(responseLatestMsg());
+  return new Response(true);
+};
 
-// Firebase messaging
-firebase.initializeApp({
-   messagingSenderId: '623133680167'
+workbox.routing.registerRoute('/api/mineBlock', mineBlock, 'POST');
+workbox.routing.registerRoute('/api/blocks', getBlocks);
+workbox.routing.registerRoute('/api/queryAll', queryAll);
+workbox.routing.registerRoute('/api/queryLatest', queryLatest);
+
+
+// Push notification handling.
+self.addEventListener('push', event => {
+  console.log('Get push...');
+
+  let eventData = {};
+  if (event.data) {
+    eventData = event.data.text();
+  }
+  var json = JSON.parse(eventData);
+  var message = JSON.parse(json.notification.body);
+  console.log(message);
+
+  switch (message.type) {
+    case MessageType.QUERY_LATEST:
+      // write(ws, responseLatestMsg());
+      break;
+    case MessageType.QUERY_ALL:
+      // write(ws, responseChainMsg());
+      break;
+    case MessageType.RESPONSE_BLOCKCHAIN:
+      handleBlockchainResponse(message);
+      break;
+  }
+
+  // Uncomment the following if you want to show the notification dialog.
+  // const options = {
+  //   body: message,
+  //   data: {
+  //     dateOfArrival: Date.now(),
+  //   },
+  // };
+  // event.waitUntil(
+  //   self.registration.showNotification('Push Notification', options)
+  // );
 });
-const messaging = firebase.messaging();
 
-messaging.setBackgroundMessageHandler(payload => {
-   const title = payload.notification.title;
-   console.log('payload', payload.notification.icon);
-   const options = {
-      body: payload.notification.body,
-      icon: payload.notification.icon
-   }
-   return self.registration.showNotification(title, options);
-})
-
-self.addEventListener('notificationclick', function(event) {
-   const clickedNotification = event.notification;
-   clickedNotification.close();
-   const promiseChain = clients
-       .matchAll({
-           type: 'window',
-           includeUncontrolled: true
-        })
-       .then(windowClients => {
-           let matchingClient = null;
-           for (let i = 0; i < windowClients.length; i++) {
-               const windowClient = windowClients[i];
-               if (windowClient.url === feClickAction) {
-                   matchingClient = windowClient;
-                   break;
-               }
-           }
-           if (matchingClient) {
-               return matchingClient.focus();
-           } else {
-               return clients.openWindow(feClickAction);
-           }
-       });
-       event.waitUntil(promiseChain);
-});
+init();

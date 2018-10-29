@@ -12,8 +12,8 @@ import './App.css';
 const App = () => (
   <main>
     <Switch>
-      <Route exact path='/' component={ChatRoom}/>
-      <Route exact path='/setup' component={Setup}/>
+      <Route exact path='/chat' component={ChatRoom}/>
+      <Route exact path='/' component={Setup}/>
     </Switch>
   </main>
 )

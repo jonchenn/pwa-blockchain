@@ -1,35 +1,28 @@
 import React, {Component} from 'react';
 import logo from './logo.svg';
-import {Switch, Route} from 'react-router-dom'
 
 class Setup extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      peer: ''
+      name: ''
     };
-
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
   }
 
   handleChange(event) {
-    this.setState({peer: event.target.value});
+    this.setState({name: event.target.value});
+  }
+
+  handleInitClick(event) {
+    // Query all blocks from peers.
+    console.log('clicked init');
+    fetch('/api/queryAll');
   }
 
   handleSubmit(event) {
-    // alert('A name was submitted: ' + this.state.value);
-
-    fetch('/addPeer', {
-      method: "POST",
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({'peer': this.state.peer})
-    });
-    // .then(response => response.json());  parses response to JSON
-
+    this.props.history.push('/chat');
     event.preventDefault();
   }
 
@@ -38,10 +31,11 @@ class Setup extends Component {
       <header className="Setup-header">
         <img src={logo} className="Setup-logo" alt="logo"/>
       </header>
+      <button onClick={this.handleInitClick}>Init</button>
       <form onSubmit={this.handleSubmit}>
         <label>
-          Peer:
-          <input type="text" value={this.state.peer} onChange={this.handleChange}/>
+          Name:
+          <input type="text" value={this.state.name} onChange={this.handleChange}/>
         </label>
         <input type="submit" value="Submit"/>
       </form>

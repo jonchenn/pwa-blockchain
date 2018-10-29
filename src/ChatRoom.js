@@ -1,9 +1,9 @@
 import React, {Component} from 'react';
-import {Link} from 'react-router-dom'
 
 class ChatRoom extends Component {
   constructor(props) {
     super(props);
+
     this.state = {
       messageToSend: '',
       messages: [],
@@ -11,17 +11,21 @@ class ChatRoom extends Component {
 
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
-
-    this.init();
   }
 
-  async init() {
-    fetch('/blocks').then((data) => {
+  componentDidMount () {
+    fetch('/api/queryAll');
+    this.timer = setInterval(this.refresh.bind(this), 1000);
+  }
+
+  async refresh() {
+    var self = this;
+    fetch('/api/blocks').then((data) => {
       return data.json();
     }).then((blocks) => {
       var messages = blocks.map((x) => {return x.data;});
       messages.shift();
-      this.setState({messages: messages});
+      self.setState({messages: messages});
     });
   }
 
@@ -30,7 +34,7 @@ class ChatRoom extends Component {
   }
 
   handleSubmit(event) {
-    fetch('/mineBlock', {
+    fetch('/api/mineBlock', {
       method: "POST",
       headers: {
         'Accept': 'application/json',
