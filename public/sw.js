@@ -13,9 +13,20 @@ const MessageType = {
 
 // Init IndexedDB
 let blockchain = [];
+let guid = null;
+
 const dbPromise = idb.open('blockchain-store', 1, upgradeDB => {
   upgradeDB.createObjectStore('keyval');
 });
+
+var genGuid = () => {
+  function s4() {
+    return Math.floor((1 + Math.random()) * 0x10000)
+      .toString(16)
+      .substring(1);
+  }
+  return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
+}
 
 const db = {
   get(key) {
@@ -167,6 +178,12 @@ var responseLatestMsg = () => ({
 
 var init = async () => {
   blockchain = await db.get('blockchain');
+  guid = await db.get('guid');
+
+  if (!guid) {
+    guid = genGuid();
+    db.set('guid', guid);
+  }
 
   // Init Blockchain if there's none.
   if (!blockchain) {
@@ -178,7 +195,10 @@ var init = async () => {
 var broadcast = (data) => {
   fetch(broadcastEndpoint, {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      sender: guid,
+      data: data,
+    }),
     headers: {
       'Content-Type': 'application/json'
     }
@@ -249,8 +269,12 @@ self.addEventListener('push', event => {
     eventData = event.data.text();
   }
   var json = JSON.parse(eventData);
-  var message = JSON.parse(json.notification.body);
+  var body = JSON.parse(json.notification.body);
+  var sender = body.sender;
+  var message = body.data;
   console.log(message);
+
+  if (sender === guid) return;
 
   switch (message.type) {
     case MessageType.QUERY_LATEST:
