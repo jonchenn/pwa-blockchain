@@ -259,6 +259,20 @@ workbox.routing.registerRoute('/api/blocks', getBlocks);
 workbox.routing.registerRoute('/api/queryAll', queryAll);
 workbox.routing.registerRoute('/api/queryLatest', queryLatest);
 
+function sendMessageToClient(message) {
+  return new Promise(function(resolve, reject) {
+    var messageChannel = new MessageChannel();
+    messageChannel.port1.onmessage = function(event) {
+      if (event.data.error) {
+        reject(event.data.error);
+      } else {
+        resolve(event.data);
+      }
+    };
+    navigator.serviceWorker.controller.postMessage(message,
+      [messageChannel.port2]);
+  });
+}
 
 // Push notification handling.
 self.addEventListener('push', event => {
@@ -285,19 +299,24 @@ self.addEventListener('push', event => {
       break;
     case MessageType.RESPONSE_BLOCKCHAIN:
       handleBlockchainResponse(message);
+      sendMessageToClient('RESPONSE_BLOCKCHAIN');
+      break;
+    default:
       break;
   }
 
   // Uncomment the following if you want to show the notification dialog.
-  // const options = {
-  //   body: message,
-  //   data: {
-  //     dateOfArrival: Date.now(),
-  //   },
-  // };
-  // event.waitUntil(
-  //   self.registration.showNotification('Push Notification', options)
-  // );
+  const options = {
+    body: message,
+    data: {
+      dateOfArrival: Date.now(),
+    },
+  };
+  event.waitUntil(
+    self.registration.showNotification('Push Notification', options)
+  );
+
+
 });
 
 init();

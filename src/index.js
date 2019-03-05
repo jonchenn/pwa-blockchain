@@ -6,10 +6,13 @@ import {
   BrowserRouter
 } from 'react-router-dom'
 import firebase from 'firebase';
-import config from './firebase-config';
 
-firebase.initializeApp(config);
+// Don't forget to put your Firebase config in src/firebase-config.js.
+import config from './config';
+
+firebase.initializeApp(config.firebaseConfig);
 const messaging = firebase.messaging();
+const endpoints = config.endpoints;
 
 ReactDOM.render((
   <BrowserRouter>
@@ -27,7 +30,7 @@ if ('serviceWorker' in navigator) {
       return messaging.getToken();
     }).then(token => {
       console.log(token);
-      fetch('https://us-central1-pwa-blockchain.cloudfunctions.net/subscribe?token=' + token).then(() => {
+      fetch(endpoints.subscribe + '?token=' + token).then(() => {
         console.log('Subscription success.');
       });
     }).catch(error => {

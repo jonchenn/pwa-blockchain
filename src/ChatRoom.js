@@ -11,11 +11,18 @@ class ChatRoom extends Component {
 
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', function(event){
+        console.log("Client 1 Received Message: " + event.data);
+      });
+    }
   }
 
   componentDidMount () {
     fetch('/api/queryAll');
-    this.timer = setInterval(this.refresh.bind(this), 1000);
+    this.refresh();
+    // this.timer = setInterval(this.refresh.bind(this), 1000);
   }
 
   async refresh() {

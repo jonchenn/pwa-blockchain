@@ -21,7 +21,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # ignore Firebase files
-src/firebase-config*
+src/firebase-config.js
 temp/*
 .runtimeconfig.json
 firebase-debug.log
+firebase.json
+.firebaserc
+functions/package*.json
